@@ -1,0 +1,51 @@
+configuration:
+  email:
+    name: E-Mail-Adresse
+    description: Deine mailbox.org-Adresse.
+  app_password:
+    name: App-Passwort
+    description: App-Passwort von mailbox.org – nicht das Hauptpasswort.
+  hub_password:
+    name: Hub-Passwort
+    description: Passwort für den Login beim Verbinden eines MCP-Clients.
+  external_url:
+    name: Externe URL
+    description: Öffentliche HTTPS-Basis-URL ohne Pfad, z. B. https://mcp.example.net
+  timezone:
+    name: Zeitzone
+    description: IANA-Zeitzone für Kalendertermine.
+  essential_tools:
+    name: Nur Kernwerkzeuge
+    description: Lädt je Dienst nur die kuratierte Werkzeugauswahl (empfohlen).
+  mail_enabled:
+    name: Mail lesen
+  mail_write:
+    name: Mail bearbeiten
+    description: Verschieben, Markieren, Entwürfe und Löschen (mit Rückfrage).
+  smtp_enabled:
+    name: SMTP-Server laden
+    description: Ohne „Senden erlauben“ nur Vorschau und Verbindungstest.
+  smtp_allow_send:
+    name: Senden erlauben
+    description: Jede Mail muss trotzdem bestätigt werden.
+  smtp_allowed_recipients:
+    name: Erlaubte Empfänger
+    description: Kommagetrennt, z. B. a@x.de,@firma.de – „*“ erlaubt alle.
+  smtp_from_name:
+    name: Absendername
+  calendar_enabled:
+    name: Kalender lesen
+  calendar_write:
+    name: Kalender bearbeiten
+  contacts_enabled:
+    name: Adressbuch lesen
+  contacts_write:
+    name: Adressbuch bearbeiten
+  imap_trusted_authserv_id:
+    name: Vertrauenswürdige authserv-id
+    description: Erstes Token im Authentication-Results-Header von mailbox.org.
+  trusted_proxies:
+    name: Vertrauenswürdige Proxys
+    description: IP/CIDR des Reverse-Proxys, kommagetrennt.
+network:
+  8099/tcp: MCP-Hub (HTTP) – nur über Reverse-Proxy mit TLS veröffentlichen
