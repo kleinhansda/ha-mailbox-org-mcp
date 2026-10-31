@@ -1,6 +1,6 @@
 # mailbox.org MCP – Home-Assistant-Add-on
 
-Bündelt die mailbox.org-Dienste **Mail, Kalender und Adressbuch** als
+Bündelt die mailbox.org-Dienste **Mail, Kalender, Adressbuch und Drive** als
 [MCP](https://modelcontextprotocol.io)-Server in einem Home-Assistant-Add-on –
 erreichbar für Claude (Web, Desktop, Mobile), ChatGPT und andere MCP-Clients
 über **einen** Connector.
@@ -20,6 +20,7 @@ hinter einem Gateway:
 | Mail senden | [smtp-mcp](https://github.com/ni-c/smtp-mcp) 0.2.0        | SMTP              | **aus**            |
 | Kalender    | [caldav-mcp](https://github.com/ni-c/caldav-mcp) 0.1.5    | CalDAV            | nur lesen          |
 | Adressbuch  | [carddav-mcp](https://github.com/ni-c/carddav-mcp) 0.1.3  | CardDAV           | nur lesen          |
+| Drive       | eigener Code, `webdav/webdav-mcp.mjs`                     | WebDAV            | **aus**            |
 
 Lesen und Senden sind bewusst getrennte Prozesse: `imap-mcp` kann nicht
 senden, `smtp-mcp` sendet nur an eine Empfänger-Allowlist und nur nach
@@ -33,9 +34,14 @@ und das Hub-Passwort erst danach serverseitig einsetzt. Das Passwort wird nie
 eingetippt und ist von außen nicht mehr nutzbar. MCP-Aufrufe, Token- und
 Registrierungs-Endpunkte reicht das Gate unverändert durch.
 
-**Nicht enthalten:** mailbox.org Drive (WebDAV) und Sieve-Filter. Für beide
-gibt es noch keinen Server mit vergleichbarem Sicherheitsmodell; Sieve ist
-zudem gefährlich, weil ein `redirect`-Filter dauerhaft serverseitig weiterleitet.
+**Drive (optional):** Der einzige fertige WebDAV-MCP-Server auf npm stellt
+Löschen und Verschieben immer bereit und hat keinen Nur-Lesen-Modus. Deshalb
+liegt ein eigener kleiner Server bei: auflisten, suchen, Textdateien lesen;
+mit `drive_write` zusätzlich Dateien und Ordner anlegen. Löschen, Verschieben
+und Freigaben gibt es nicht, `drive_root` begrenzt den Zugriff auf einen Ordner.
+
+**Nicht enthalten:** Sieve-Filter. Sieve ist gefährlich, weil ein
+`redirect`-Filter dauerhaft serverseitig weiterleitet.
 
 ## Installation
 
@@ -45,14 +51,18 @@ zudem gefährlich, weil ein `redirect`-Filter dauerhaft serverseitig weiterleite
 
 ## Tests
 
-`bash tests/gate/run.sh [RS256|ES256|EdDSA]` prüft das Passkey-Gate gegen
-einen Mock-IdP und eine Hub-Attrappe (Node 22+, keine Abhängigkeiten).
+- `bash tests/gate/run.sh [RS256|ES256|EdDSA]` prüft das Passkey-Gate gegen
+  einen Mock-IdP und eine Hub-Attrappe (Node 22+, keine Abhängigkeiten).
+- `bash tests/webdav/run.sh` prüft den Drive-Server gegen einen lokalen
+  WebDAV-Server (Lesen, Schreiben, Pfadausbrüche, 401).
 
 ## Status
 
 Frühe Version. Mail, Kalender und Adressbuch verbinden sich mit einem echten
 mailbox.org-Konto. Das Passkey-Gate ist gegen mcp-hub 0.11.7 mit einem
-Test-OIDC-Anbieter durchgetestet, aber noch nicht gegen Pocket ID selbst.
+Test-OIDC-Anbieter durchgetestet, aber noch nicht gegen Pocket ID selbst. Der
+Drive-Server ist gegen einen lokalen WebDAV-Server getestet, noch nicht gegen
+mailbox.org Drive.
 Issues willkommen.
 
 ## Lizenz
