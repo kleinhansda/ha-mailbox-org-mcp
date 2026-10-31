@@ -2,9 +2,9 @@
 
 ## 0.3.1
 
-- Behoben: Die Gesundheitsprüfung des Basis-Images fragte Port 80 ab statt
-  8099. Home Assistant blieb dadurch bei „Wird gestartet“, und der Watchdog
-  startete die App alle paar Minuten neu.
+- Behoben: Die Gesundheitsprüfung des Basis-Images fragte Port 80 ab, nicht
+  den Port 8099 des Add-ons. Home Assistant blieb dadurch bei „Wird gestartet“,
+  und der Watchdog startete die App alle paar Minuten neu.
 
 ## 0.3.0
 
