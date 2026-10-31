@@ -2,8 +2,11 @@
 
 ## Voraussetzungen
 
-- **App-Passwort** bei mailbox.org anlegen (Einstellungen → Sicherheit →
-  App-Passwörter). Niemals das Hauptpasswort verwenden.
+- **Passwörter** bei mailbox.org anlegen (Einstellungen → Sicherheit), niemals
+  das Hauptpasswort verwenden. Pro Anwendungstyp ein eigenes: ein
+  **E-Mail-App-Passwort** für Mail (`app_password`) und ein
+  **Anwendungspasswort „Kalender- und Adressbuch-Client (CalDAV/CardDAV)“** für
+  Kalender und Adressbuch (`dav_password`).
 - Eine **öffentliche HTTPS-Adresse** mit Reverse-Proxy (z. B. Nginx Proxy
   Manager oder Cloudflare Tunnel) auf Port `8099` des Add-ons. Ohne TLS
   funktioniert der OAuth-Login nicht. Läuft der Proxy/Tunnel selbst als App in
@@ -16,7 +19,8 @@
 | Option                     | Bedeutung                                                                                  |
 | -------------------------- | ------------------------------------------------------------------------------------------ |
 | `email`                    | Deine mailbox.org-Adresse                                                                  |
-| `app_password`             | App-Passwort (gilt für IMAP, SMTP, CalDAV, CardDAV)                                         |
+| `app_password`             | E-Mail-App-Passwort (IMAP, SMTP). Für Kalender/Adressbuch nur als Fallback, wenn `dav_password` leer ist |
+| `dav_password`             | Anwendungspasswort vom Typ „Kalender- und Adressbuch-Client (CalDAV/CardDAV)“. mailbox.org vergibt Passwörter je Anwendungstyp, ein E-Mail-App-Passwort gilt nicht für Kalender/Adressbuch (HTTP 401). Leer = `app_password` |
 | `hub_password`             | Passwort für den Login, den Claude beim Verbinden anzeigt                                  |
 | `external_url`             | Öffentliche Basis-URL ohne Pfad, z. B. `https://mcp.example.net`                           |
 | `timezone`                 | IANA-Zeitzone für Kalendertermine                                                          |
