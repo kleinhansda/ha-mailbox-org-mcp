@@ -25,6 +25,9 @@ const str = (v) => (typeof v === "string" ? v.trim() : "");
 
 const email = str(o.email);
 const appPassword = str(o.app_password);
+// mailbox.org vergibt Passwörter je Anwendungstyp: Kalender/Adressbuch brauchen
+// ein eigenes "CalDAV/CardDAV"-Anwendungspasswort. Ohne Angabe gilt app_password.
+const davPassword = str(o.dav_password) || appPassword;
 const hubPassword = str(o.hub_password);
 const externalUrl = str(o.external_url).replace(/\/+$/, "");
 
@@ -78,7 +81,7 @@ if (o.calendar_enabled) {
   const env = {
     CALDAV_URL: "https://dav.mailbox.org/",
     CALDAV_USERNAME: "${MBX_EMAIL}",
-    CALDAV_PASSWORD: "${MBX_PASSWORD}",
+    CALDAV_PASSWORD: "${MBX_DAV_PASSWORD}",
     CALDAV_TIMEZONE: str(o.timezone) || "Europe/Berlin",
     CALDAV_USER_EMAIL: email,
     CALDAV_READ_ONLY: o.calendar_write ? "false" : "true",
@@ -92,7 +95,7 @@ if (o.contacts_enabled) {
   const env = {
     CARDDAV_URL: "https://dav.mailbox.org/",
     CARDDAV_USERNAME: "${MBX_EMAIL}",
-    CARDDAV_PASSWORD: "${MBX_PASSWORD}",
+    CARDDAV_PASSWORD: "${MBX_DAV_PASSWORD}",
     CARDDAV_READ_ONLY: o.contacts_write ? "false" : "true",
   };
   if (essential) env.CARDDAV_ALLOW_TOOLS = "essential";
@@ -143,6 +146,7 @@ const hubEnv = {
   PASSWORD: hubPassword,
   MBX_EMAIL: email,
   MBX_PASSWORD: appPassword,
+  MBX_DAV_PASSWORD: davPassword,
 };
 if (trusted) hubEnv.TRUSTED_PROXIES = trusted;
 

@@ -5,6 +5,9 @@ configuration:
   app_password:
     name: App-Passwort
     description: App-Passwort von mailbox.org – nicht das Hauptpasswort.
+  dav_password:
+    name: DAV-Passwort
+    description: "Anwendungspasswort „Kalender- und Adressbuch-Client (CalDAV/CardDAV)“ von mailbox.org. Leer = App-Passwort wird verwendet."
   hub_password:
     name: Hub-Passwort
     description: Passwort für den Login beim Verbinden eines MCP-Clients.

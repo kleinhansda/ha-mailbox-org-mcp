@@ -1,5 +1,5 @@
 name: mailbox.org MCP
-version: "0.2.0"
+version: "0.2.1"
 slug: mailbox_org_mcp
 description: Mail, Kalender und Kontakte von mailbox.org als MCP-Server für Claude & Co.
 url: https://github.com/kleinhansda/ha-mailbox-org-mcp
@@ -16,6 +16,7 @@ ports_description:
 options:
   email: ""
   app_password: ""
+  dav_password: ""
   hub_password: ""
   external_url: ""
   timezone: Europe/Berlin
@@ -40,6 +41,7 @@ options:
 schema:
   email: email
   app_password: password
+  dav_password: password?
   hub_password: password
   external_url: url
   timezone: str

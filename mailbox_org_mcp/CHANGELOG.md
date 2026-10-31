@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Neu: `dav_password` für Kalender und Adressbuch. mailbox.org vergibt
+  Passwörter je Anwendungstyp; ein E-Mail-App-Passwort führte bei CalDAV/CardDAV
+  zu HTTP 401. Ohne Angabe gilt weiterhin `app_password`.
+
 ## 0.2.0
 
 - Neu: optionales **Passkey-Gate** (`passkey_enabled`). Freigaben laufen über

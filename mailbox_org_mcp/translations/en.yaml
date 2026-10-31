@@ -5,6 +5,9 @@ configuration:
   app_password:
     name: App password
     description: mailbox.org app password – not your main password.
+  dav_password:
+    name: DAV password
+    description: 'mailbox.org application password of type "Calendar and address book client (CalDAV/CardDAV)". Empty = app password is used.'
   hub_password:
     name: Hub password
     description: Password for the login shown when an MCP client connects.
