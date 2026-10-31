@@ -8,6 +8,9 @@ configuration:
   dav_password:
     name: DAV password
     description: 'mailbox.org application password of type "Calendar and address book client (CalDAV/CardDAV)". Empty = app password is used.'
+  webdav_password:
+    name: WebDAV password
+    description: "mailbox.org application password of type WebDAV client, only needed for Drive."
   hub_password:
     name: Hub password
     description: Password for the login shown when an MCP client connects.
@@ -44,6 +47,15 @@ configuration:
     name: Read contacts
   contacts_write:
     name: Modify contacts
+  drive_enabled:
+    name: Read Drive
+    description: "List and search files in mailbox.org Drive and read text files."
+  drive_write:
+    name: Modify Drive
+    description: "Create text files and folders. Deleting and moving are not available."
+  drive_root:
+    name: Drive base folder
+    description: "Restrict access to this folder, e.g. /Userstore/Name/MCP. Empty = whole Drive."
   imap_trusted_authserv_id:
     name: Trusted authserv-id
     description: First token of mailbox.org's Authentication-Results header.

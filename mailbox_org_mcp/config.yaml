@@ -1,7 +1,7 @@
 name: mailbox.org MCP
-version: "0.2.1"
+version: "0.3.0"
 slug: mailbox_org_mcp
-description: Mail, Kalender und Kontakte von mailbox.org als MCP-Server für Claude & Co.
+description: Mail, Kalender, Kontakte und Drive von mailbox.org als MCP-Server für Claude & Co.
 url: https://github.com/kleinhansda/ha-mailbox-org-mcp
 arch:
   - amd64
@@ -17,6 +17,7 @@ options:
   email: ""
   app_password: ""
   dav_password: ""
+  webdav_password: ""
   hub_password: ""
   external_url: ""
   timezone: Europe/Berlin
@@ -31,6 +32,9 @@ options:
   calendar_write: false
   contacts_enabled: true
   contacts_write: false
+  drive_enabled: false
+  drive_write: false
+  drive_root: ""
   imap_trusted_authserv_id: ""
   trusted_proxies: ""
   passkey_enabled: false
@@ -42,6 +46,7 @@ schema:
   email: email
   app_password: password
   dav_password: password?
+  webdav_password: password?
   hub_password: password
   external_url: url
   timezone: str
@@ -56,6 +61,9 @@ schema:
   calendar_write: bool
   contacts_enabled: bool
   contacts_write: bool
+  drive_enabled: bool
+  drive_write: bool
+  drive_root: str?
   imap_trusted_authserv_id: str?
   trusted_proxies: str?
   passkey_enabled: bool

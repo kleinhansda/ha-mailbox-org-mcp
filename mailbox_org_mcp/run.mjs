@@ -102,6 +102,22 @@ if (o.contacts_enabled) {
   servers.contacts = { command: "carddav-mcp", args: [], env };
 }
 
+// --- Drive (WebDAV) ------------------------------------------------------
+// Eigener kleiner Server (webdav/webdav-mcp.mjs): nur lesen, solange
+// drive_write aus ist; Löschen/Verschieben gibt es nicht.
+const webdavPassword = str(o.webdav_password);
+if (o.drive_enabled) {
+  if (!webdavPassword) fail("'drive_enabled' braucht 'webdav_password' (mailbox.org-Anwendungspasswort vom Typ „WebDAV-Client“).");
+  const env = {
+    WEBDAV_URL: "https://dav.mailbox.org/servlet/webdav.infostore",
+    WEBDAV_USERNAME: "${MBX_EMAIL}",
+    WEBDAV_PASSWORD: "${MBX_WEBDAV_PASSWORD}",
+    WEBDAV_ROOT: str(o.drive_root) || "/",
+    WEBDAV_READ_ONLY: o.drive_write ? "false" : "true",
+  };
+  servers.drive = { command: "node", args: ["/app/webdav/webdav-mcp.mjs"], env };
+}
+
 if (Object.keys(servers).length === 0) fail("Kein Dienst aktiviert.");
 
 // --- Passkey-Gate (optional) ---------------------------------------------
@@ -147,6 +163,7 @@ const hubEnv = {
   MBX_EMAIL: email,
   MBX_PASSWORD: appPassword,
   MBX_DAV_PASSWORD: davPassword,
+  MBX_WEBDAV_PASSWORD: webdavPassword,
 };
 if (trusted) hubEnv.TRUSTED_PROXIES = trusted;
 
