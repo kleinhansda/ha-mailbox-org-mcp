@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Neu: **mailbox.org Drive** über WebDAV (`drive_enabled`, aus per Standard).
+  Eigener kleiner Server: Ordner auflisten, Dateien suchen, Textdateien lesen.
+  Mit `drive_write` zusätzlich Textdateien und Ordner anlegen; Löschen und
+  Verschieben gibt es nicht. `drive_root` beschränkt den Zugriff auf einen
+  Ordner. Braucht ein eigenes Anwendungspasswort „WebDAV-Client“
+  (`webdav_password`).
+
 ## 0.2.1
 
 - Neu: `dav_password` für Kalender und Adressbuch. mailbox.org vergibt

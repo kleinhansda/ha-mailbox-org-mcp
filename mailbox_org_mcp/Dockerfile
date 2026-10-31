@@ -12,6 +12,12 @@ RUN npm install -g --ignore-scripts \
       @ni-c/carddav-mcp@0.1.3 \
     && npm cache clean --force
 
+# Drive (WebDAV): eigener kleiner Server, Abhängigkeiten exakt gepinnt
+COPY webdav/package.json webdav/webdav-mcp.mjs /app/webdav/
+RUN cd /app/webdav \
+    && npm install --omit=dev --ignore-scripts --no-audit --no-fund \
+    && npm cache clean --force
+
 COPY run.mjs gate.mjs /app/
 
 # Entrypoint läuft als root (liest /data/options.json, setzt Rechte),

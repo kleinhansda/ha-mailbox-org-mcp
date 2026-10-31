@@ -6,7 +6,8 @@
   das Hauptpasswort verwenden. Pro Anwendungstyp ein eigenes: ein
   **E-Mail-App-Passwort** für Mail (`app_password`) und ein
   **Anwendungspasswort „Kalender- und Adressbuch-Client (CalDAV/CardDAV)“** für
-  Kalender und Adressbuch (`dav_password`).
+  Kalender und Adressbuch (`dav_password`). Für Drive zusätzlich ein
+  **Anwendungspasswort „WebDAV-Client“** (`webdav_password`).
 - Eine **öffentliche HTTPS-Adresse** mit Reverse-Proxy (z. B. Nginx Proxy
   Manager oder Cloudflare Tunnel) auf Port `8099` des Add-ons. Ohne TLS
   funktioniert der OAuth-Login nicht. Läuft der Proxy/Tunnel selbst als App in
@@ -21,6 +22,7 @@
 | `email`                    | Deine mailbox.org-Adresse                                                                  |
 | `app_password`             | E-Mail-App-Passwort (IMAP, SMTP). Für Kalender/Adressbuch nur als Fallback, wenn `dav_password` leer ist |
 | `dav_password`             | Anwendungspasswort vom Typ „Kalender- und Adressbuch-Client (CalDAV/CardDAV)“. mailbox.org vergibt Passwörter je Anwendungstyp, ein E-Mail-App-Passwort gilt nicht für Kalender/Adressbuch (HTTP 401). Leer = `app_password` |
+| `webdav_password`          | Anwendungspasswort vom Typ „WebDAV-Client“, nur für Drive nötig                            |
 | `hub_password`             | Passwort für den Login, den Claude beim Verbinden anzeigt                                  |
 | `external_url`             | Öffentliche Basis-URL ohne Pfad, z. B. `https://mcp.example.net`                           |
 | `timezone`                 | IANA-Zeitzone für Kalendertermine                                                          |
@@ -33,6 +35,8 @@
 | `smtp_from_name`           | Anzeigename des Absenders                                                                  |
 | `calendar_enabled` / `calendar_write` | Kalender lesen / schreiben                                                      |
 | `contacts_enabled` / `contacts_write` | Adressbuch lesen / schreiben                                                    |
+| `drive_enabled` / `drive_write` | Drive lesen / Textdateien und Ordner anlegen (kein Löschen, kein Verschieben)         |
+| `drive_root`               | Drive-Zugriff auf einen Ordner beschränken, z. B. `/Userstore/Name/MCP`; leer = ganzes Drive |
 | `imap_trusted_authserv_id` | authserv-id aus dem `Authentication-Results`-Header von mailbox.org; macht SPF/DKIM-Urteile vertrauenswürdig |
 | `trusted_proxies`          | IP/CIDR deines Reverse-Proxys, damit das Login-Rate-Limit pro Client greift (z. B. `172.30.32.0/23` für einen Tunnel als HA-App) |
 | `passkey_enabled`          | Passkey-Gate vor den Hub schalten (siehe unten)                                            |
@@ -42,6 +46,29 @@
 
 Standard ist überall **nur lesen**. Schreib- und Sendewerkzeuge werden nicht
 abgelehnt, sondern gar nicht erst registriert.
+
+## Drive (optional)
+
+mailbox.org Drive läuft über WebDAV (`https://dav.mailbox.org/servlet/webdav.infostore`).
+Dafür bringt das Add-on einen eigenen kleinen Server mit (`webdav/webdav-mcp.mjs`):
+
+| Werkzeug               | Wirkung                                                              |
+| ---------------------- | -------------------------------------------------------------------- |
+| `drive_list`           | Ordnerinhalt auflisten                                               |
+| `drive_search`         | Dateien/Ordner nach Namensteil suchen (rekursiv, begrenzt)           |
+| `drive_info`           | Größe, Typ, Änderungsdatum                                           |
+| `drive_read`           | Textdatei lesen (UTF-8, bis 1 MiB); PDFs, Bilder, Office nicht       |
+| `drive_write_file`     | nur mit `drive_write`: Textdatei anlegen, Ersetzen nur mit `overwrite` |
+| `drive_create_folder`  | nur mit `drive_write`: Ordner anlegen                                 |
+
+Löschen, Verschieben, Kopieren und Freigaben gibt es bewusst nicht. Pfade
+können `drive_root` nicht verlassen (`..` und kodierte Varianten werden
+abgewiesen).
+
+Einrichtung: mailbox.org → Einstellungen → Sicherheit → Anwendungspasswörter →
+„WebDAV-Client“, in `webdav_password` eintragen, `drive_enabled` an. Lass
+`drive_root` zuerst leer und frag nach dem Inhalt von `/`, um die Ordnerstruktur
+zu sehen; danach auf den gewünschten Ordner beschränken.
 
 ## Passkey-Login (optional)
 
@@ -85,7 +112,7 @@ verbinden sich bereits freigegebene Clients über ihre Tokens, ohne Login.
   Connector → `https://<external_url>/hub` → mit `hub_password` anmelden
   (bzw. mit Passkey, wenn `passkey_enabled` an ist).
 - **Einzelner Dienst:** `https://<external_url>/mail/mcp`,
-  `/smtp/mcp`, `/calendar/mcp`, `/contacts/mcp`.
+  `/smtp/mcp`, `/calendar/mcp`, `/contacts/mcp`, `/drive/mcp`.
 
 ## Verwaltung
 
