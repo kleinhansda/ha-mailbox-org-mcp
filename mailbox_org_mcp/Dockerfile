@@ -1,6 +1,6 @@
 # Basis: mcp-hub (Node 24, tini, uid 1000 "node"). Multi-arch amd64/arm64.
 # Für reproduzierbare Builds zusätzlich auf @sha256:<digest> pinnen.
-FROM ghcr.io/ni-c/mcp-hub:0.11.6
+FROM ghcr.io/ni-c/mcp-hub:0.11.7
 
 USER root
 
@@ -12,7 +12,7 @@ RUN npm install -g --ignore-scripts \
       @ni-c/carddav-mcp@0.1.3 \
     && npm cache clean --force
 
-COPY run.mjs /app/run.mjs
+COPY run.mjs gate.mjs /app/
 
 # Entrypoint läuft als root (liest /data/options.json, setzt Rechte),
 # startet den Hub danach per setpriv als uid 1000.

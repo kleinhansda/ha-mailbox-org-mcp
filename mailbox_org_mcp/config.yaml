@@ -1,5 +1,5 @@
 name: mailbox.org MCP
-version: "0.1.0"
+version: "0.2.0"
 slug: mailbox_org_mcp
 description: Mail, Kalender und Kontakte von mailbox.org als MCP-Server für Claude & Co.
 url: https://github.com/kleinhansda/ha-mailbox-org-mcp
@@ -10,9 +10,9 @@ init: false
 startup: services
 boot: auto
 ports:
-  8099/tcp: 8099
+  8099/tcp: null
 ports_description:
-  8099/tcp: MCP-Hub (HTTP) – nur hinter einem Reverse-Proxy mit TLS veröffentlichen
+  8099/tcp: MCP-Hub (HTTP) – standardmäßig nicht veröffentlicht; Reverse-Proxy/Tunnel nutzt den internen Hostnamen
 options:
   email: ""
   app_password: ""
@@ -32,6 +32,11 @@ options:
   contacts_write: false
   imap_trusted_authserv_id: ""
   trusted_proxies: ""
+  passkey_enabled: false
+  oidc_issuer: ""
+  oidc_client_id: ""
+  oidc_client_secret: ""
+  passkey_allowed_users: ""
 schema:
   email: email
   app_password: password
@@ -51,3 +56,8 @@ schema:
   contacts_write: bool
   imap_trusted_authserv_id: str?
   trusted_proxies: str?
+  passkey_enabled: bool
+  oidc_issuer: str?
+  oidc_client_id: str?
+  oidc_client_secret: password?
+  passkey_allowed_users: str?

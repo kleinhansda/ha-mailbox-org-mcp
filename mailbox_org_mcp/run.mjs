@@ -3,9 +3,11 @@
 // and expanded by mcp-hub (${VAR}); they are never written into mcp.json.
 import { chownSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 
 const OPTIONS = process.env.OPTIONS_PATH || "/data/options.json";
 const HUB_DATA = "/data/hub";
+const GATE_DATA = "/data/gate";
 const CONFIG_DIR = "/data/hub-config";
 const CONFIG = `${CONFIG_DIR}/mcp.json`;
 const NODE_UID = 1000;
@@ -99,6 +101,18 @@ if (o.contacts_enabled) {
 
 if (Object.keys(servers).length === 0) fail("Kein Dienst aktiviert.");
 
+// --- Passkey-Gate (optional) ---------------------------------------------
+const passkey = o.passkey_enabled === true;
+const oidcIssuer = str(o.oidc_issuer).replace(/\/+$/, "");
+const oidcClientId = str(o.oidc_client_id);
+const oidcClientSecret = str(o.oidc_client_secret);
+const allowedUsers = str(o.passkey_allowed_users);
+if (passkey) {
+  if (!/^https:\/\/[^/?#]+(\/[^?#]*)?$/.test(oidcIssuer)) fail("'oidc_issuer' muss eine https-URL sein, z. B. https://id.example.net");
+  if (!oidcClientId || !oidcClientSecret) fail("'oidc_client_id' und 'oidc_client_secret' sind bei 'passkey_enabled' Pflicht.");
+  if (!allowedUsers) fail("'passkey_allowed_users' ist bei 'passkey_enabled' Pflicht (E-Mail-Adressen oder Benutzernamen, kommagetrennt).");
+}
+
 const config = JSON.stringify({ mcpServers: servers }, null, 2) + "\n";
 
 if (DRY_RUN) {
@@ -106,18 +120,23 @@ if (DRY_RUN) {
   process.exit(0);
 }
 
-for (const dir of [HUB_DATA, CONFIG_DIR]) {
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+for (const dir of [HUB_DATA, CONFIG_DIR, GATE_DATA]) {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
   chownSync(dir, NODE_UID, NODE_GID);
 }
 writeFileSync(CONFIG, config, { mode: 0o644 });
 log(`Dienste: ${Object.keys(servers).join(", ")} | Werkzeugauswahl: ${essential ? "essential" : "alle"}`);
 
-const env = {
-  PATH: process.env.PATH,
-  HOME: "/home/node",
-  NODE_ENV: "production",
-  PORT: "8099",
+// Ohne Gate lauscht der Hub direkt auf 8099. Mit Gate lauscht das Gate auf
+// 8099 und der Hub intern auf 8100; das Gate ist dann der einzige direkte
+// Proxy des Hubs und wird über "loopback" als vertrauenswürdig eingetragen.
+const hubPort = passkey ? "8100" : "8099";
+const trusted = [passkey ? "loopback" : "", str(o.trusted_proxies)].filter(Boolean).join(",");
+
+const base = { PATH: process.env.PATH, HOME: "/home/node", NODE_ENV: "production" };
+const hubEnv = {
+  ...base,
+  PORT: hubPort,
   CONFIG_PATH: CONFIG,
   DATA_PATH: HUB_DATA,
   EXTERNAL_URL: externalUrl,
@@ -125,13 +144,47 @@ const env = {
   MBX_EMAIL: email,
   MBX_PASSWORD: appPassword,
 };
-if (str(o.trusted_proxies)) env.TRUSTED_PROXIES = str(o.trusted_proxies);
+if (trusted) hubEnv.TRUSTED_PROXIES = trusted;
 
-// Root ablegen: Hub und alle Kindprozesse laufen als node (uid 1000)
-const child = spawn(
-  "setpriv",
-  [`--reuid=${NODE_UID}`, `--regid=${NODE_GID}`, "--init-groups", "--", "node", "/app/dist/index.js"],
-  { env, stdio: "inherit", cwd: "/app" },
-);
-for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => child.kill(sig));
-child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+const children = [];
+const asNode = (args, env, name) => {
+  const c = spawn("setpriv", [`--reuid=${NODE_UID}`, `--regid=${NODE_GID}`, "--init-groups", "--", ...args], {
+    env,
+    stdio: "inherit",
+    cwd: "/app",
+  });
+  c.on("exit", (code, signal) => {
+    log(`${name} beendet (code=${code}, signal=${signal}) – Add-on wird beendet.`);
+    for (const other of children) if (other !== c && other.exitCode === null) other.kill("SIGTERM");
+    process.exit(code ?? (signal ? 1 : 0));
+  });
+  children.push(c);
+};
+
+// Root ablegen: Hub, Gate und alle Kindprozesse laufen als node (uid 1000)
+asNode(["node", "/app/dist/index.js"], hubEnv, "mcp-hub");
+
+if (passkey) {
+  const secretFile = `${GATE_DATA}/secret`;
+  if (!existsSync(secretFile)) writeFileSync(secretFile, randomBytes(48), { mode: 0o600 });
+  chownSync(secretFile, NODE_UID, NODE_GID);
+  asNode(
+    ["node", "/app/gate.mjs"],
+    {
+      ...base,
+      GATE_PORT: "8099",
+      HUB_PORT: hubPort,
+      EXTERNAL_URL: externalUrl,
+      OIDC_ISSUER: oidcIssuer,
+      OIDC_CLIENT_ID: oidcClientId,
+      OIDC_CLIENT_SECRET: oidcClientSecret,
+      GATE_ALLOWED_USERS: allowedUsers,
+      HUB_PASSWORD: hubPassword,
+      GATE_SECRET_FILE: secretFile,
+    },
+    "passkey-gate",
+  );
+  log(`Passkey-Gate aktiv (${oidcIssuer}); Callback-URL für den Anbieter: ${externalUrl}/passkey/callback`);
+}
+
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => children.forEach((c) => c.kill(sig)));

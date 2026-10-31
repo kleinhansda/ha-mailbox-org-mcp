@@ -47,5 +47,18 @@ configuration:
   trusted_proxies:
     name: Trusted proxies
     description: IP/CIDR of your reverse proxy, comma-separated.
+  passkey_enabled:
+    name: Passkey login
+    description: Approve clients via an OIDC provider (e.g. Pocket ID) instead of the hub password.
+  oidc_issuer:
+    name: OIDC provider
+    description: Base URL, e.g. https://id.example.net
+  oidc_client_id:
+    name: OIDC client ID
+  oidc_client_secret:
+    name: OIDC client secret
+  passkey_allowed_users:
+    name: Allowed users
+    description: Email addresses or usernames at the provider, comma-separated.
 network:
-  8099/tcp: MCP hub (HTTP) – publish only behind a TLS reverse proxy
+  8099/tcp: MCP hub (HTTP) – publish only behind a reverse proxy or tunnel

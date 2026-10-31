@@ -47,5 +47,18 @@ configuration:
   trusted_proxies:
     name: Vertrauenswürdige Proxys
     description: IP/CIDR des Reverse-Proxys, kommagetrennt.
+  passkey_enabled:
+    name: Passkey-Login
+    description: Freigaben über einen OIDC-Anbieter (z. B. Pocket ID) statt Hub-Passwort.
+  oidc_issuer:
+    name: OIDC-Anbieter
+    description: Basis-URL, z. B. https://id.example.net
+  oidc_client_id:
+    name: OIDC-Client-ID
+  oidc_client_secret:
+    name: OIDC-Client-Secret
+  passkey_allowed_users:
+    name: Freigegebene Benutzer
+    description: E-Mail-Adressen oder Benutzernamen beim Anbieter, kommagetrennt.
 network:
-  8099/tcp: MCP-Hub (HTTP) – nur über Reverse-Proxy mit TLS veröffentlichen
+  8099/tcp: MCP-Hub (HTTP) – nur über Reverse-Proxy oder Tunnel veröffentlichen
