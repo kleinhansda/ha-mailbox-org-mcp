@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Behoben: Die Gesundheitsprüfung des Basis-Images fragte Port 80 ab statt
+  8099. Home Assistant blieb dadurch bei „Wird gestartet“, und der Watchdog
+  startete die App alle paar Minuten neu.
+
 ## 0.3.0
 
 - Neu: **mailbox.org Drive** über WebDAV (`drive_enabled`, aus per Standard).

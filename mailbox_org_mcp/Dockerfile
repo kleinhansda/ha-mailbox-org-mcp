@@ -20,6 +20,12 @@ RUN cd /app/webdav \
 
 COPY run.mjs gate.mjs /app/
 
+# Das Basis-Image prüft :80/livez (sein Standard-PORT). Hier lauscht auf 8099
+# der Hub oder das Passkey-Gate (reicht /livez an den Hub durch). Ohne diese
+# Zeile bleibt Home Assistant bei "Wird gestartet" und der Watchdog startet neu.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:8099/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
 # Entrypoint läuft als root (liest /data/options.json, setzt Rechte),
 # startet den Hub danach per setpriv als uid 1000.
 ENTRYPOINT ["tini", "--"]
