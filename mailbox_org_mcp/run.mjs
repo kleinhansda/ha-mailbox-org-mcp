@@ -2,7 +2,7 @@
 // drops root and starts mcp-hub. Secrets are passed via the hub's environment
 // and expanded by mcp-hub (${VAR}); they are never written into mcp.json.
 import { chownSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
 const OPTIONS = process.env.OPTIONS_PATH || "/data/options.json";
@@ -39,6 +39,13 @@ if (!/^https:\/\/[^/]+$/.test(externalUrl))
 const essential = o.essential_tools !== false;
 const servers = {};
 
+// --- Arbeitsordner (optional) ----------------------------------------------
+// Gemeinsamer Ordner mit ArtCraft, Foto MCP und Open Terminal: Mail-Anhänge
+// landen in inbox/, Anhänge zum Senden kommen aus out/, Drive kopiert in beide
+// Richtungen. Die Server laufen als uid 1000 und brauchen dort Schreibrechte.
+const workDir = str(o.work_dir).replace(/\/+$/, "");
+if (workDir && !/^\/share\/[^\s]+$/.test(workDir)) fail("'work_dir' muss unter /share liegen, z. B. /share/artcraft/work");
+
 // --- Mail lesen (IMAP) ---------------------------------------------------
 if (o.mail_enabled) {
   const env = {
@@ -50,7 +57,8 @@ if (o.mail_enabled) {
     // imap-mcp: nur das Literal "false" schaltet Schreib-Tools frei
     IMAP_READ_ONLY: o.mail_write ? "false" : "true",
   };
-  if (essential) env.IMAP_ALLOW_TOOLS = "essential";
+  if (workDir) env.IMAP_DOWNLOAD_DIR = `${workDir}/inbox`;
+  if (essential) env.IMAP_ALLOW_TOOLS = workDir ? "essential,get_attachments" : "essential";
   if (str(o.imap_trusted_authserv_id)) env.IMAP_TRUSTED_AUTHSERV_ID = str(o.imap_trusted_authserv_id);
   servers.mail = { command: "imap-mcp", args: [], env };
 }
@@ -72,6 +80,7 @@ if (o.smtp_enabled) {
     if (!rcpt) fail("'smtp_allow_send' braucht 'smtp_allowed_recipients' (Adressen/@domains, '*' = alle).");
     env.SMTP_ALLOWED_RECIPIENTS = rcpt;
   }
+  if (workDir) env.SMTP_ATTACHMENT_DIR = `${workDir}/out`;
   if (essential) env.SMTP_ALLOW_TOOLS = "essential";
   servers.smtp = { command: "smtp-mcp", args: [], env };
 }
@@ -115,6 +124,7 @@ if (o.drive_enabled) {
     WEBDAV_ROOT: str(o.drive_root) || "/",
     WEBDAV_READ_ONLY: o.drive_write ? "false" : "true",
   };
+  if (workDir) env.WORK_DIR = workDir;
   servers.drive = { command: "node", args: ["/app/webdav/webdav-mcp.mjs"], env };
 }
 
@@ -144,6 +154,17 @@ for (const dir of [HUB_DATA, CONFIG_DIR, GATE_DATA]) {
   chownSync(dir, NODE_UID, NODE_GID);
 }
 writeFileSync(CONFIG, config, { mode: 0o644 });
+
+if (workDir) {
+  for (const d of ["inbox", "out"]) mkdirSync(`${workDir}/${d}`, { recursive: true });
+  // Schreibrechte für uid 1000, auch als Vorgabe für später angelegte Dateien.
+  const acl = spawnSync("setfacl", ["-R", "-m", `u:${NODE_UID}:rwX`, "-m", `d:u:${NODE_UID}:rwX`, workDir], { stdio: "ignore" });
+  if (acl.status === 0) log(`Arbeitsordner: ${workDir} (inbox/, out/, Rechte per ACL)`);
+  else {
+    for (const d of ["inbox", "out"]) chownSync(`${workDir}/${d}`, NODE_UID, NODE_GID);
+    log(`Arbeitsordner: ${workDir} (ohne ACL, inbox/ und out/ gehören uid ${NODE_UID})`);
+  }
+}
 log(`Dienste: ${Object.keys(servers).join(", ")} | Werkzeugauswahl: ${essential ? "essential" : "alle"}`);
 
 // Ohne Gate lauscht der Hub direkt auf 8099. Mit Gate lauscht das Gate auf
