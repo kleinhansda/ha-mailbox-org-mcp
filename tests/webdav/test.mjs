@@ -1,6 +1,6 @@
 // Test für webdav-mcp.mjs gegen einen lokalen WebDAV-Server (webdav-server).
 // Aufruf: bash tests/webdav/run.sh
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -120,6 +120,47 @@ await c.close();
 c = await connect({});
 r = await call(c, "drive_list", { path: "/" });
 check("Basis / listet Wurzel", json(r)?.items?.map((i) => i.name).join(",") === "Geheim,Userstore", r.text);
+await c.close();
+
+// --- 4. Arbeitsordner --------------------------------------------------------
+const work = mkdtempSync(join(tmpdir(), "work-"));
+const outside = mkdtempSync(join(tmpdir(), "draussen-"));
+writeFileSync(join(outside, "geheim.txt"), "nicht lesen");
+mkdirSync(join(work, "out"));
+writeFileSync(join(work, "out/ergebnis.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]));
+symlinkSync(outside, join(work, "raus"));
+c = await connect({ WEBDAV_ROOT: "/Userstore/David", WORK_DIR: work });
+tools = (await c.listTools()).tools.map((t) => t.name).sort();
+check("Arbeitsordner: lesen + kopieren ins Arbeitsverzeichnis, kein Upload ohne Schreibrecht", tools.includes("work_list") && tools.includes("drive_to_work") && !tools.includes("work_to_drive"), tools.join(","));
+r = await call(c, "drive_to_work", { path: "/bild.png" });
+check("drive_to_work Binärdatei nach inbox/", !r.err && Buffer.compare(readFileSync(join(work, "inbox/bild.png")), readFileSync(join(dir, "Userstore/David/bild.png"))) === 0, r.text);
+r = await call(c, "drive_to_work", { path: "/bild.png" });
+check("drive_to_work überschreibt nicht (bild-1.png)", !r.err && json(r)?.copied?.[0]?.to === "/inbox/bild-1.png" && existsSync(join(work, "inbox/bild-1.png")), r.text);
+r = await call(c, "drive_to_work", { path: "/Dokumente", target: "/inbox/doku" });
+check("drive_to_work Ordner (nur Dateien, nicht rekursiv)", !r.err && readdirSync(join(work, "inbox/doku")).join(",") === "notiz.md", r.text);
+r = await call(c, "work_list", { path: "/inbox" });
+check("work_list", json(r)?.items?.map((i) => i.name).join(",") === "doku,bild-1.png,bild.png", r.text);
+for (const t of ["../draussen", "/raus", "/raus/sub", "inbox/../../draussen"]) {
+  r = await call(c, "drive_to_work", { path: "/Dokumente/notiz.md", target: t });
+  check(`drive_to_work Ziel außerhalb blockiert: ${t}`, r.err && !existsSync(join(outside, "notiz.md")) && !existsSync(join(outside, "sub")), r.text);
+}
+r = await call(c, "drive_to_work", { path: "/Dokumente/notiz.md", target: "%2e%2e" });
+check("kodierte Punkte sind lokal nur ein Ordnername", !r.err && existsSync(join(work, "%2e%2e/notiz.md")), r.text);
+r = await call(c, "work_list", { path: "/raus" });
+check("work_list folgt keinem Link nach draußen", r.err && !r.text.includes("geheim"), r.text);
+await c.close();
+
+c = await connect({ WEBDAV_ROOT: "/Userstore/David", WEBDAV_READ_ONLY: "false", WORK_DIR: work });
+r = await call(c, "work_to_drive", { source: "/out/ergebnis.png", target: "/KI-Ergebnisse" });
+check("work_to_drive legt Ordner an und lädt hoch", !r.err && Buffer.compare(readFileSync(join(dir, "Userstore/David/KI-Ergebnisse/ergebnis.png")), readFileSync(join(work, "out/ergebnis.png"))) === 0, r.text);
+r = await call(c, "work_to_drive", { source: "/out/ergebnis.png", target: "/KI-Ergebnisse" });
+check("work_to_drive ohne overwrite abgelehnt", r.err && /existiert/.test(r.text), r.text);
+r = await call(c, "work_to_drive", { source: "/out/ergebnis.png", target: "/KI-Ergebnisse", overwrite: true });
+check("work_to_drive mit overwrite", !r.err, r.text);
+r = await call(c, "work_to_drive", { source: "/raus/geheim.txt", target: "/" });
+check("work_to_drive Quelle außerhalb blockiert", r.err && !existsSync(join(dir, "Userstore/David/geheim.txt")), r.text);
+r = await call(c, "work_to_drive", { source: "/out/ergebnis.png", target: "../../Geheim" });
+check("work_to_drive Ziel bleibt in Drive-Basis", r.err && !existsSync(join(dir, "Geheim/ergebnis.png")), r.text);
 await c.close();
 
 srv.stop(() => {});
