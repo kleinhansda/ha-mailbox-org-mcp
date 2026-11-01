@@ -37,6 +37,7 @@
 | `contacts_enabled` / `contacts_write` | Adressbuch lesen / schreiben                                                    |
 | `drive_enabled` / `drive_write` | Drive lesen / Textdateien und Ordner anlegen (kein Löschen, kein Verschieben)         |
 | `drive_root`               | Drive-Zugriff auf einen Ordner beschränken, z. B. `/Userstore/Name/MCP`; leer = ganzes Drive |
+| `work_dir`                 | Arbeitsordner unter `/share` (Standard `/share/artcraft/work`), siehe unten; leer = aus     |
 | `imap_trusted_authserv_id` | authserv-id aus dem `Authentication-Results`-Header von mailbox.org; macht SPF/DKIM-Urteile vertrauenswürdig |
 | `trusted_proxies`          | IP/CIDR deines Reverse-Proxys, damit das Login-Rate-Limit pro Client greift (z. B. `172.30.32.0/23` für einen Tunnel als HA-App) |
 | `passkey_enabled`          | Passkey-Gate vor den Hub schalten (siehe unten)                                            |
@@ -60,8 +61,10 @@ Dafür bringt das Add-on einen eigenen kleinen Server mit (`webdav/webdav-mcp.mj
 | `drive_read`           | Textdatei lesen (UTF-8, bis 1 MiB); PDFs, Bilder, Office nicht       |
 | `drive_write_file`     | nur mit `drive_write`: Textdatei anlegen, Ersetzen nur mit `overwrite` |
 | `drive_create_folder`  | nur mit `drive_write`: Ordner anlegen                                 |
+| `work_list`, `drive_to_work` | mit `work_dir`: Arbeitsordner auflisten, Dateien aus dem Drive dorthin kopieren |
+| `work_to_drive`        | mit `work_dir` und `drive_write`: Datei aus dem Arbeitsordner ins Drive |
 
-Löschen, Verschieben, Kopieren und Freigaben gibt es bewusst nicht. Pfade
+Löschen, Verschieben, Kopieren innerhalb des Drives und Freigaben gibt es bewusst nicht. Pfade
 können `drive_root` nicht verlassen (`..` und kodierte Varianten werden
 abgewiesen).
 
@@ -69,6 +72,25 @@ Einrichtung: mailbox.org → Einstellungen → Sicherheit → Anwendungspasswör
 „WebDAV-Client“, in `webdav_password` eintragen, `drive_enabled` an. Lass
 `drive_root` zuerst leer und frag nach dem Inhalt von `/`, um die Ordnerstruktur
 zu sehen; danach auf den gewünschten Ordner beschränken.
+
+## Arbeitsordner
+
+Mit `work_dir` (Standard `/share/artcraft/work`) teilt das Add-on einen Ordner mit
+ArtCraft, Foto MCP und Open Terminal. Das Add-on legt `inbox/` und `out/` an und gibt
+den Servern (uid 1000) dort Schreibrechte.
+
+| Dienst | Was                                                                                      |
+| ------ | ---------------------------------------------------------------------------------------- |
+| Mail   | `get_attachments` speichert Anhänge nach `inbox/` (bei `essential_tools` zusätzlich freigeschaltet) |
+| Senden | Anhänge nur aus `out/`, nur Dateiname ohne Ordner, mit Typprüfung von smtp-mcp           |
+| Drive  | `work_list` listet den Arbeitsordner, `drive_to_work` kopiert Dateien beliebigen Typs (bis 100 MiB, Ordner nicht rekursiv, höchstens 50) nach `inbox/`. Mit `drive_write` zusätzlich `work_to_drive` (z. B. Ergebnisse aus `out/` ins Drive) |
+
+Im Arbeitsordner wird nie überschrieben: bei gleichem Namen heißt die Kopie
+`name-1.jpg`. Pfade können den Arbeitsordner nicht verlassen, auch nicht über Links.
+`drive_to_work` schreibt lokal und ist deshalb auch ohne `drive_write` da.
+
+`map: share` gibt dem Add-on Zugriff auf ganz `/share`. Die Server nutzen nur
+`work_dir`, die Grenze ziehen ihre Pfadprüfungen, nicht Home Assistant.
 
 ## Passkey-Login (optional)
 

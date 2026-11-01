@@ -56,6 +56,9 @@ configuration:
   drive_root:
     name: Drive-Basisordner
     description: "Zugriff auf diesen Ordner beschränken, z. B. /Userstore/Name/MCP. Leer = ganzes Drive."
+  work_dir:
+    name: Arbeitsordner
+    description: "Ordner unter /share, gemeinsam mit ArtCraft, Foto MCP und Open Terminal. Mail-Anhänge werden nach inbox/ gespeichert, Anhänge zum Senden kommen aus out/, Drive kopiert in beide Richtungen. Leer = aus."
   imap_trusted_authserv_id:
     name: Vertrauenswürdige authserv-id
     description: Erstes Token im Authentication-Results-Header von mailbox.org.

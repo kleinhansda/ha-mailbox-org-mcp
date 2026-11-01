@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- Neu: **Arbeitsordner** (`work_dir`, Standard `/share/artcraft/work`), gemeinsam
+  mit ArtCraft, Foto MCP und Open Terminal. Mail-Anhänge werden mit
+  `get_attachments` nach `inbox/` gespeichert, Anhänge zum Senden kommen aus
+  `out/`. Drive: `work_list`, `drive_to_work` (Dateien beliebigen Typs aus dem
+  Drive in den Arbeitsordner) und mit `drive_write` `work_to_drive`.
+- Das Add-on bindet `/share` ein und setzt im Arbeitsordner Schreibrechte für
+  uid 1000 (ACL).
+
 ## 0.3.1
 
 - Behoben: Die Gesundheitsprüfung des Basis-Images fragte Port 80 ab, nicht

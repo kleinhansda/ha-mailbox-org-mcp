@@ -1,5 +1,5 @@
 name: mailbox.org MCP
-version: "0.3.1"
+version: "0.4.0"
 slug: mailbox_org_mcp
 description: Mail, Kalender, Kontakte und Drive von mailbox.org als MCP-Server für Claude & Co.
 url: https://github.com/kleinhansda/ha-mailbox-org-mcp
@@ -9,6 +9,9 @@ arch:
 init: false
 startup: services
 boot: auto
+map:
+  - type: share
+    read_only: false
 ports:
   8099/tcp: null
 ports_description:
@@ -35,6 +38,7 @@ options:
   drive_enabled: false
   drive_write: false
   drive_root: ""
+  work_dir: /share/artcraft/work
   imap_trusted_authserv_id: ""
   trusted_proxies: ""
   passkey_enabled: false
@@ -64,6 +68,7 @@ schema:
   drive_enabled: bool
   drive_write: bool
   drive_root: str?
+  work_dir: "match(^(/share/[^\\s]+)?$)"
   imap_trusted_authserv_id: str?
   trusted_proxies: str?
   passkey_enabled: bool

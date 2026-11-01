@@ -18,6 +18,13 @@ RUN cd /app/webdav \
     && npm install --omit=dev --ignore-scripts --no-audit --no-fund \
     && npm cache clean --force
 
+# setfacl: Schreibrechte für uid 1000 im Arbeitsordner unter /share. Fehlt es,
+# übergibt run.mjs inbox/ und out/ per chown (kein Abbruch des Builds).
+RUN (command -v setfacl >/dev/null 2>&1) \
+    || (command -v apk >/dev/null 2>&1 && apk add --no-cache acl) \
+    || (apt-get update && apt-get install -y --no-install-recommends acl && rm -rf /var/lib/apt/lists/*) \
+    || echo "setfacl nicht installiert, Fallback chown"
+
 COPY run.mjs gate.mjs /app/
 
 # Das Basis-Image prüft :80/livez (sein Standard-PORT). Hier lauscht auf 8099
