@@ -8,7 +8,11 @@
 // - Alle Pfade werden auf WEBDAV_ROOT beschränkt ("..", Kodierungstricks).
 // - Lesen nur für Textdateien bis WEBDAV_MAX_READ_BYTES; Dateiinhalte werden
 //   als nicht vertrauenswürdig gekennzeichnet (Prompt Injection).
-import { posix } from "node:path";
+// - Mit WORK_DIR (lokaler Arbeitsordner unter /share): Dateien beliebigen Typs
+//   aus dem Drive dorthin kopieren und, nur mit Schreibrecht, von dort ins Drive.
+//   Im Arbeitsordner wird nie überschrieben (neuer Name bei Namensgleichheit).
+import { posix, join as pjoin, dirname as pdirname, basename as pbasename, extname as pextname, relative as prelative } from "node:path";
+import { existsSync, readdirSync, realpathSync, statSync, writeFileSync, readFileSync, mkdirSync, lstatSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createClient } from "webdav";
@@ -22,6 +26,9 @@ const READ_ONLY = env.WEBDAV_READ_ONLY !== "false"; // nur das Literal "false" s
 const MAX_READ = Math.max(1024, Number(env.WEBDAV_MAX_READ_BYTES) || 1024 * 1024);
 const MAX_WRITE = 1024 * 1024;
 const LIST_LIMIT = 500;
+const WORK_DIR = (env.WORK_DIR || "").trim();
+const WORK_MAX = Math.max(1024, Number(env.WORK_MAX_BYTES) || 100 * 1024 * 1024);
+const COPY_LIMIT = 50;
 const SEARCH_DIR_LIMIT = 300;
 
 if (!URL_ || !USER || !PASS) {
@@ -59,6 +66,31 @@ const toRel = (abs) => {
   return a === ROOT ? "/" : a.startsWith(ROOT + "/") ? a.slice(ROOT.length) : a;
 };
 
+// --- Arbeitsordner (lokal) -------------------------------------------------
+// Pfad des Modells relativ zu WORK_DIR → absoluter lokaler Pfad. Symlinks, die
+// hinausführen, werden über realpath abgefangen.
+export function resolveWork(p, work = WORK_DIR) {
+  const s = String(p ?? "/");
+  if (/[\0\\]/.test(s)) throw new Error("Ungültiges Zeichen im Pfad");
+  if (s.split("/").includes("..")) throw new Error("'..' ist nicht erlaubt");
+  const rel = posix.normalize("/" + s).replace(/^\/+/, "");
+  const base = realpathSync(work);
+  const abs = pjoin(base, rel);
+  let probe = abs;
+  while (!existsSync(probe)) probe = pdirname(probe);
+  const real = realpathSync(probe);
+  if (real !== base && !real.startsWith(base + "/")) throw new Error("Pfad außerhalb des Arbeitsordners");
+  return abs;
+}
+const workRel = (abs) => "/" + prelative(realpathSync(WORK_DIR), abs).split("\\").join("/");
+// freier Name: datei.jpg, datei-1.jpg, datei-2.jpg …
+function freeName(dir, name) {
+  const ext = pextname(name), stem = name.slice(0, name.length - ext.length);
+  let cand = name, n = 1;
+  while (existsSync(pjoin(dir, cand))) cand = `${stem}-${n++}${ext}`;
+  return cand;
+}
+
 // --- Client --------------------------------------------------------------
 const client = createClient(URL_, { username: USER, password: PASS });
 
@@ -91,7 +123,7 @@ function decodeText(buf) {
 }
 
 // --- Server --------------------------------------------------------------
-const server = new McpServer({ name: "mailbox-org-drive", version: "0.1.0" });
+const server = new McpServer({ name: "mailbox-org-drive", version: "0.2.0" });
 const RO = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const pathArg = z.string().default("/").describe("Pfad im Drive, z. B. /Dokumente. \"/\" ist der freigegebene Basisordner.");
 
@@ -210,5 +242,81 @@ if (!READ_ONLY) {
   );
 }
 
+if (WORK_DIR) {
+  if (!existsSync(WORK_DIR)) mkdirSync(WORK_DIR, { recursive: true });
+  const workArg = (d) => z.string().default(d).describe(`Ordner im Arbeitsordner, z. B. ${d}. "/" ist der Arbeitsordner selbst (für ArtCraft, Foto MCP und Open Terminal).`);
+
+  server.registerTool(
+    "work_list",
+    { title: "Arbeitsordner auflisten", description: "Listet Dateien und Ordner im lokalen Arbeitsordner (nicht rekursiv). inbox/ = Eingänge, out/ = Ergebnisse.", inputSchema: { path: workArg("/") }, annotations: RO },
+    wrap(async ({ path }) => {
+      const abs = resolveWork(path);
+      const items = readdirSync(abs, { withFileTypes: true }).filter((d) => !d.name.startsWith(".")).map((d) => {
+        const st = statSync(pjoin(abs, d.name));
+        return { name: d.name, type: d.isDirectory() ? "folder" : "file", ...(d.isDirectory() ? {} : { size: st.size }), modified: st.mtime.toISOString() };
+      });
+      items.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "folder" ? -1 : 1));
+      return ok({ path: workRel(abs), count: items.length, truncated: items.length > LIST_LIMIT, items: items.slice(0, LIST_LIMIT) });
+    }),
+  );
+
+  server.registerTool(
+    "drive_to_work",
+    {
+      title: "Aus dem Drive in den Arbeitsordner kopieren",
+      description: `Kopiert eine Datei (beliebiger Typ, bis ${Math.round(WORK_MAX / 1048576)} MiB) oder alle Dateien eines Drive-Ordners (nicht rekursiv, höchstens ${COPY_LIMIT}) in den Arbeitsordner, Standard inbox/. Bestehende Dateien werden nicht überschrieben, die Kopie bekommt dann einen neuen Namen. Danach können ArtCraft, Foto MCP oder Open Terminal sie bearbeiten.`,
+      inputSchema: { path: z.string().describe("Datei oder Ordner im Drive"), target: workArg("/inbox") },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    wrap(async ({ path, target }) => {
+      const src = resolvePath(path);
+      const st = await client.stat(src);
+      const files = st.type === "file" ? [st]
+        : (await client.getDirectoryContents(src)).filter((s) => s.type === "file" && toRel(s.filename) !== toRel(src));
+      if (!files.length) return err(new Error("Keine Dateien gefunden."));
+      if (files.length > COPY_LIMIT) return err(new Error(`Zu viele Dateien (${files.length}, Grenze ${COPY_LIMIT}). Einzeln oder einen kleineren Ordner kopieren.`));
+      const dir = resolveWork(target);
+      mkdirSync(dir, { recursive: true });
+      const copied = [], skipped = [];
+      for (const f of files) {
+        if (f.size > WORK_MAX) { skipped.push({ path: toRel(f.filename), reason: `zu groß (${f.size} Bytes)` }); continue; }
+        const buf = Buffer.from(await client.getFileContents(resolvePath(toRel(f.filename)), { format: "binary" }));
+        const name = freeName(dir, f.basename);
+        writeFileSync(pjoin(dir, name), buf, { flag: "wx" });
+        copied.push({ from: toRel(f.filename), to: workRel(pjoin(dir, name)), size: buf.length });
+      }
+      return ok({ copied, skipped });
+    }),
+  );
+
+  if (!READ_ONLY) {
+    server.registerTool(
+      "work_to_drive",
+      {
+        title: "Aus dem Arbeitsordner ins Drive kopieren",
+        description: `Lädt eine Datei aus dem Arbeitsordner (z. B. /out/bild_final.jpg, bis ${Math.round(WORK_MAX / 1048576)} MiB) in einen Drive-Ordner. Bestehende Dateien im Drive werden nur mit overwrite=true ersetzt. Die Datei im Arbeitsordner bleibt.`,
+        inputSchema: {
+          source: z.string().describe("Datei im Arbeitsordner, z. B. /out/bild_final.jpg"),
+          target: z.string().describe("Zielordner im Drive, z. B. /KI-Ergebnisse"),
+          overwrite: z.boolean().default(false),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+      },
+      wrap(async ({ source, target, overwrite }) => {
+        const src = resolveWork(source);
+        const lst = lstatSync(src);
+        if (!lst.isFile()) return err(new Error("Quelle ist keine Datei."));
+        if (lst.size > WORK_MAX) return err(new Error(`Datei zu groß (${lst.size} Bytes, Grenze ${WORK_MAX}).`));
+        const dir = resolvePath(target);
+        if (!(await client.exists(dir))) await client.createDirectory(dir, { recursive: true });
+        const dst = resolvePath(posix.join(toRel(dir), pbasename(src)));
+        if ((await client.exists(dst)) && !overwrite) return err(new Error("Datei existiert im Drive bereits. Mit overwrite=true ersetzen."));
+        await client.putFileContents(dst, readFileSync(src), { overwrite: true });
+        return ok({ uploaded: toRel(dst), from: workRel(src), bytes: lst.size });
+      }),
+    );
+  }
+}
+
 await server.connect(new StdioServerTransport());
-console.error(`[webdav-mcp] bereit (${READ_ONLY ? "nur lesen" : "lesen+schreiben"}, Basis ${ROOT})`);
+console.error(`[webdav-mcp] bereit (${READ_ONLY ? "nur lesen" : "lesen+schreiben"}, Basis ${ROOT}${WORK_DIR ? `, Arbeitsordner ${WORK_DIR}` : ""})`);
